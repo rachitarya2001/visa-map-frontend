@@ -114,7 +114,7 @@ export interface ProgressData {
 // API Helper Functions
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const defaultOptions: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -124,11 +124,11 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
   try {
     const response = await fetch(url, { ...defaultOptions, ...options });
-    
+
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -239,12 +239,12 @@ export const saveProgress = async (payload: ProgressData) => {
     return { success: true, data: response.data };
   } catch (error) {
     console.error('Failed to save progress to backend, falling back to localStorage:', error);
-    
+
     // Fallback to localStorage
     try {
       const existingData = localStorage.getItem('visamap_progress');
       const data = existingData ? JSON.parse(existingData) : {};
-      
+
       const updatedData = {
         ...data,
         [payload.email]: {
@@ -253,7 +253,7 @@ export const saveProgress = async (payload: ProgressData) => {
           lastUpdated: new Date().toISOString()
         }
       };
-      
+
       localStorage.setItem('visamap_progress', JSON.stringify(updatedData));
       return { success: true };
     } catch (localError) {
@@ -270,17 +270,59 @@ export const loadProgress = async (email: string): Promise<ProgressData | null> 
     return response.data.progress;
   } catch (error) {
     console.error('Failed to load progress from backend, falling back to localStorage:', error);
-    
+
     // Fallback to localStorage
     try {
       const existingData = localStorage.getItem('visamap_progress');
       if (!existingData) return null;
-      
+
       const data = JSON.parse(existingData);
       return data[email] || null;
     } catch (localError) {
       console.error('Failed to load progress from localStorage:', localError);
       return null;
     }
+  }
+};
+
+// Add this new function for resume journey
+export const checkResumeJourney = async (email: string): Promise<{
+  shouldResume: boolean;
+  journey: any;
+} | null> => {
+  try {
+    const response = await apiRequest(`/journeys/resume/${encodeURIComponent(email)}`);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to check resume journey:', error);
+    return null;
+  }
+};
+
+// Add this function to get all user journeys for dashboard
+export const getUserJourneys = async (): Promise<any[]> => {
+  try {
+    console.log('🔍 getUserJourneys: Making API call...');
+    const response = await apiRequest('/journeys');
+    console.log('📡 getUserJourneys: API response:', response);
+
+    if (response.status === 'success' && response.data) {
+      return response.data.journeys || [];
+    }
+
+    console.warn('⚠️ Unexpected API response format:', response);
+    return [];
+  } catch (error) {
+    console.error('❌ getUserJourneys: API call failed:', error);
+
+    // Log more details for debugging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
+
+    return [];
   }
 };

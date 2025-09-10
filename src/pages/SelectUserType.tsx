@@ -36,9 +36,18 @@ const iconMap = {
 interface SelectUserTypeProps {
   onNext: (userType: string) => void;
   onBack: () => void;
+  user?: any;
+  onDashboard?: () => void;
+  onSignOut?: () => void;
 }
 
-export default function SelectUserType({ onNext, onBack }: SelectUserTypeProps) {
+export default function SelectUserType({
+  onNext,
+  onBack,
+  user,
+  onDashboard,
+  onSignOut
+}: SelectUserTypeProps) {
   const [selectedType, setSelectedType] = useState<string>("student");
 
   const handleContinue = () => {
@@ -49,14 +58,14 @@ export default function SelectUserType({ onNext, onBack }: SelectUserTypeProps) 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted">
-      <Navbar />
+      <Navbar user={user} onDashboard={onDashboard} onSignOut={onSignOut} />
       <div className="container mx-auto px-4 py-6 lg:py-8">
         <div className="flex flex-col items-center mb-6 lg:mb-8">
           <VisaMonkLogo className="mb-6 lg:mb-8 animate-fade-in" />
-          
-          <ProgressIndicator 
-            currentStep={2} 
-            totalSteps={4} 
+
+          <ProgressIndicator
+            currentStep={2}
+            totalSteps={4}
             steps={["Countries", "User Type", "Visa Type", "Details"]}
           />
         </div>
@@ -76,27 +85,24 @@ export default function SelectUserType({ onNext, onBack }: SelectUserTypeProps) 
               const IconComponent = iconMap[type.icon as keyof typeof iconMap];
               const isSelected = selectedType === type.id;
               const isEnabled = type.id === "student"; // Only student enabled for v1
-              
+
               return (
                 <div
                   key={type.id}
-                  className={`relative transition-all duration-300 border rounded-lg bg-card text-card-foreground shadow-sm ${
-                    isSelected 
-                      ? "ring-2 ring-primary shadow-branded" 
-                      : ""
-                  } ${
-                    !isEnabled 
-                      ? "opacity-50 cursor-not-allowed" 
+                  className={`relative transition-all duration-300 border rounded-lg bg-card text-card-foreground shadow-sm ${isSelected
+                    ? "ring-2 ring-primary shadow-branded"
+                    : ""
+                    } ${!isEnabled
+                      ? "opacity-50 cursor-not-allowed"
                       : "cursor-pointer hover:shadow-md"
-                  }`}
+                    }`}
                   onClick={() => isEnabled && setSelectedType(type.id)}
                 >
                   <div className="p-6 flex flex-col items-center text-center space-y-4 min-h-[200px]">
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      isSelected 
-                        ? "bg-primary text-primary-foreground" 
-                        : "bg-muted text-muted-foreground"
-                    }`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                      }`}>
                       <IconComponent className="w-8 h-8" />
                     </div>
                     <div className="w-full">
@@ -116,18 +122,18 @@ export default function SelectUserType({ onNext, onBack }: SelectUserTypeProps) 
                   {isSelected && isEnabled && (
                     <div className="border-t border-border p-4">
                       <div className="flex gap-3">
-                        <Button 
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation();
                             onBack();
                           }}
-                          variant="outline" 
+                          variant="outline"
                           size="sm"
                           className="flex-1"
                         >
                           Back
                         </Button>
-                        <Button 
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleContinue();

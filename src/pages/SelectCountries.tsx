@@ -16,7 +16,12 @@ import { PlaceholderSection } from "@/components/PlaceholderSection";
 import { ComingSoonModal } from "@/components/ComingSoonModal";
 import { Country, UserFormData } from "@/types/visa";
 import { Toaster } from "@/components/ui/sonner";
+import { OTPRegistration } from "@/components/OTPRegistration";
+import { OTPLogin } from "@/components/OTPLogin";
 import { saveProgress, getOriginCountries, getDestinationCountries, checkRouteSupport } from "@/lib/api";
+import { checkResumeJourney } from "@/lib/api";
+import { getUserJourneys } from "@/lib/api";
+
 
 // Fallback countries for when API is not available
 const fallbackCountries: Country[] = [
@@ -49,16 +54,28 @@ const fallbackDialingCodes = [
 ];
 
 interface SelectCountriesProps {
-  onNext: (fromCountry: string, toCountry: string, userData: UserFormData) => void;
+  onNext: (fromCountry: string, toCountry: string, userData: UserFormData, resumeJourney?: any) => void;
+  user?: any;
+  onUserLogin?: (userData: any) => void;
+  onDashboard?: () => void;
+  onSignOut?: () => void;
 }
 
-export default function SelectCountries({ onNext }: SelectCountriesProps) {
+export default function SelectCountries({
+  onNext,
+  user,
+  onUserLogin,
+  onDashboard,
+  onSignOut
+}: SelectCountriesProps) {
   const [fromCountry, setFromCountry] = useState<string>("");
   const [toCountry, setToCountry] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [showForm, setShowForm] = useState<boolean>(false);
   const [showComingSoon, setShowComingSoon] = useState<boolean>(false);
-  const [comingSoonCountries, setComingSoonCountries] = useState<{from: string, to: string}>({from: "", to: ""});
+  const [showLogin, setShowLogin] = useState(false);
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
+  const [comingSoonCountries, setComingSoonCountries] = useState<{ from: string, to: string }>({ from: "", to: "" });
   const [formData, setFormData] = useState<UserFormData>({
     firstName: "",
     lastName: "",
@@ -68,7 +85,7 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
   });
   const [formError, setFormError] = useState<string>("");
   const [emailError, setEmailError] = useState<string>("");
-  
+
   // Dynamic data state
   const [originCountries, setOriginCountries] = useState<Country[]>([]);
   const [destinationCountries, setDestinationCountries] = useState<Country[]>([]);
@@ -81,16 +98,16 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
     const loadCountries = async () => {
       try {
         setLoading(true);
-        
+
         // Load origin and destination countries in parallel
         const [origins, destinations] = await Promise.all([
           getOriginCountries(),
           getDestinationCountries()
         ]);
-        
+
         setOriginCountries(origins);
         setDestinationCountries(destinations);
-        
+
         // Create dialing codes from countries data
         const allCountries = [...origins, ...destinations];
         const uniqueDialingCodes = allCountries
@@ -100,14 +117,14 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
             country: country.name,
             flag: country.flag
           }))
-          .filter((code, index, self) => 
+          .filter((code, index, self) =>
             index === self.findIndex(c => c.code === code.code)
           );
-        
+
         if (uniqueDialingCodes.length > 0) {
           setDialingCodes(uniqueDialingCodes);
         }
-        
+
       } catch (error) {
         console.error('Failed to load countries:', error);
         // Use fallback data
@@ -164,30 +181,82 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
   };
 
   const handleFormSubmit = async () => {
+    // If user is already logged in, use their data and skip validation
+    if (user) {
+      const userFormData = {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        mobile: user.mobile,
+        dialingCode: user.dialingCode,
+      };
+
+      // Save progress
+      const progressData = {
+        email: user.email,
+        originCountry: fromCountry,
+        destinationCountry: toCountry,
+        timestamps: {
+          countrySelection: new Date().toISOString()
+        }
+      };
+      saveProgress(progressData);
+
+      // Check route support and proceed
+      setCheckingRoute(true);
+      try {
+        const isSupported = await checkRouteSupport(fromCountry, toCountry);
+
+        if (!isSupported) {
+          setComingSoonCountries({ from: fromCountry, to: toCountry });
+          setShowComingSoon(true);
+          return;
+        }
+
+        onNext(fromCountry, toCountry, userFormData);
+      } catch (error) {
+        console.error('Failed to check route support:', error);
+        // Fallback: only support IN->GB for now
+        const isSupported = fromCountry === "IN" && toCountry === "GB";
+
+        if (!isSupported) {
+          setComingSoonCountries({ from: fromCountry, to: toCountry });
+          setShowComingSoon(true);
+          return;
+        }
+
+        onNext(fromCountry, toCountry, userFormData);
+      } finally {
+        setCheckingRoute(false);
+      }
+      return;
+    }
+
+    // Original validation logic for anonymous users
     let hasErrors = false;
-    
+
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
       setFormError("First name and last name are required");
       hasErrors = true;
     } else {
       setFormError("");
     }
-    
+
     if (!formData.email || !validateEmail(formData.email)) {
       setEmailError("Please enter a valid email address");
       hasErrors = true;
     } else {
       setEmailError("");
     }
-    
+
     if (!formData.mobile || !validatePhone(formData.mobile)) {
       setFormError("Please enter a valid phone number");
       hasErrors = true;
     }
-    
+
     if (hasErrors) return;
-    
-    // Save progress
+
+    // Save progress for anonymous users
     if (formData.email) {
       const progressData = {
         email: formData.email,
@@ -199,32 +268,32 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
       };
       saveProgress(progressData);
     }
-    
-    // Check if this route is supported dynamically
+
+    // Check route support for anonymous users
     setCheckingRoute(true);
     try {
       const isSupported = await checkRouteSupport(fromCountry, toCountry);
-      
+
       if (!isSupported) {
-        setComingSoonCountries({from: fromCountry, to: toCountry});
+        setComingSoonCountries({ from: fromCountry, to: toCountry });
         setShowComingSoon(true);
         setShowForm(false);
         return;
       }
-      
+
       onNext(fromCountry, toCountry, formData);
     } catch (error) {
       console.error('Failed to check route support:', error);
       // Fallback: only support IN->GB for now
       const isSupported = fromCountry === "IN" && toCountry === "GB";
-      
+
       if (!isSupported) {
-        setComingSoonCountries({from: fromCountry, to: toCountry});
+        setComingSoonCountries({ from: fromCountry, to: toCountry });
         setShowComingSoon(true);
         setShowForm(false);
         return;
       }
-      
+
       onNext(fromCountry, toCountry, formData);
     } finally {
       setCheckingRoute(false);
@@ -254,7 +323,7 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
   const handleCountryCardSelect = (countryCode: string) => {
     setToCountry(countryCode);
     // Scroll to country selection section
-    document.querySelector('[data-country-selection]')?.scrollIntoView({ 
+    document.querySelector('[data-country-selection]')?.scrollIntoView({
       behavior: 'smooth',
       block: 'center'
     });
@@ -266,21 +335,21 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
 
   const getDestinationCountriesForSelection = () => {
     if (!fromCountry) return destinationCountries.length > 0 ? destinationCountries : fallbackCountries;
-    return destinationCountries.length > 0 
+    return destinationCountries.length > 0
       ? destinationCountries.filter(country => country.code !== fromCountry)
       : fallbackCountries.filter(country => country.code !== fromCountry);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/90 to-muted/50 flex flex-col">
-      <Navbar />
-      
+      <Navbar user={user} onDashboard={onDashboard} onSignOut={onSignOut} />
+
       <div className="flex-1 container mx-auto px-4 py-6 lg:py-8">
         <div className="flex flex-col mb-6 lg:mb-8">
           <div className="mb-6 lg:mb-8 animate-fade-in">
-            <ProgressIndicator 
-              currentStep={1} 
-              totalSteps={4} 
+            <ProgressIndicator
+              currentStep={1}
+              totalSteps={4}
               steps={["Countries", "User Type", "Visa Type", "Details"]}
             />
           </div>
@@ -323,8 +392,8 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
                         </div>
                       ) : (
                         getDepartureCountries().map((country) => (
-                          <SelectItem 
-                            key={country.code} 
+                          <SelectItem
+                            key={country.code}
                             value={country.code}
                             className="hover:bg-primary/5 transition-colors duration-200"
                           >
@@ -370,8 +439,8 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
                         </div>
                       ) : (
                         getDestinationCountriesForSelection().map((country) => (
-                          <SelectItem 
-                            key={country.code} 
+                          <SelectItem
+                            key={country.code}
                             value={country.code}
                             className="hover:bg-primary/5 transition-colors duration-200"
                           >
@@ -393,10 +462,9 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
                 </div>
               )}
 
-              <Button 
-                onClick={handleContinue}
-                size="lg"
-                className="w-full h-14 text-lg font-semibold bg-gradient-hero hover:bg-gradient-hero/90 text-white shadow-branded hover:shadow-lg transition-all duration-300 rounded-xl"
+              <Button
+                onClick={user ? handleFormSubmit : () => setShowForm(true)}
+                className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
                 disabled={!fromCountry || !toCountry || loading}
               >
                 {loading ? (
@@ -411,151 +479,142 @@ export default function SelectCountries({ onNext }: SelectCountriesProps) {
                   </>
                 )}
               </Button>
+
+              {/* Add Login Link */}
+              {!user && (
+                <div className="text-center mt-3">
+                  <button
+                    onClick={() => setShowLogin(true)}
+                    className="text-sm text-muted-foreground hover:text-primary underline"
+                  >
+                    Already have an account? Login here
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Country Visa Cards Section */}
         <CountryVisaCards onCountrySelect={handleCountryCardSelect} />
-        
+
         {/* Stats Section */}
         <StatsSection />
-        
+
         {/* Placeholder Section */}
         <PlaceholderSection />
       </div>
 
-      {/* Enhanced Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md shadow-2xl border-0 bg-card/95 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle className="text-xl font-semibold">Your Information</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 p-0 hover:bg-muted/50"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
-                  <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                    placeholder="Enter first name"
-                    className="mt-1 h-11"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName" className="text-sm font-medium">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                    placeholder="Enter last name"
-                    className="mt-1 h-11"
-                  />
-                </div>
-              </div>
+      {/* Authentication Modals */}
+      {/* Authentication Modals */}
+      {!user && (
+        <>
 
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleEmailChange(e.target.value)}
-                  placeholder="Enter email address"
-                  className={`mt-1 h-11 ${emailError ? "border-destructive" : ""}`}
-                />
-                {emailError && (
-                  <p className="text-destructive text-xs mt-1">{emailError}</p>
-                )}
-              </div>
+          {showForm && authMode === 'register' && (
+            <OTPRegistration
+              onSuccess={(userData) => {
+                setShowForm(false);
+                console.log('Registration successful:', userData);
 
-              <div>
-                <Label htmlFor="mobile" className="text-sm font-medium">Mobile/WhatsApp *</Label>
-                <div className="flex gap-2 mt-1">
-                  <Select 
-                    value={formData.dialingCode} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, dialingCode: value }))}
-                  >
-                    <SelectTrigger className="w-32 h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dialingCodes.map((dialingCode, index) => (
-                        <SelectItem key={`${dialingCode.code}-${index}`} value={dialingCode.code}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{dialingCode.flag}</span>
-                            <span>{dialingCode.code}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="mobile"
-                    value={formData.mobile}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="Enter mobile number"
-                    className="flex-1 h-11"
-                  />
-                </div>
-              </div>
+                if (onUserLogin) {
+                  onUserLogin(userData);
+                }
 
-              {(formError || emailError) && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                  {formError && <p className="text-destructive text-sm font-medium">{formError}</p>}
-                  {emailError && <p className="text-destructive text-sm font-medium">{emailError}</p>}
-                </div>
-              )}
+                // Extract user data from the registration response
+                const user = userData.user;
+                const registrationFormData = {
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  email: user.email,
+                  mobile: user.mobile,
+                  dialingCode: user.dialingCode,
+                };
 
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 h-11"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleFormSubmit}
-                  className="flex-1 h-11 bg-gradient-hero hover:bg-gradient-hero/90 text-white"
-                  disabled={checkingRoute}
-                >
-                  {checkingRoute ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Checking Route...
-                    </>
-                  ) : (
-                    <>
-                      Register & Continue
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                // Update form data
+                setFormData(registrationFormData);
+
+                // Check if countries are selected, if not show error
+                if (!fromCountry || !toCountry) {
+                  toast.error("Please select your origin and destination countries first.");
+                  return;
+                }
+
+                // Proceed to next step with countries
+                onNext(fromCountry, toCountry, registrationFormData);
+              }}
+              onCancel={() => setShowForm(false)}
+            />
+          )}
+
+          {showLogin && (
+            <OTPLogin
+              onSuccess={async (userData) => {
+                setShowLogin(false);
+                console.log('Login successful:', userData);
+
+                if (onUserLogin) {
+                  onUserLogin(userData);
+                }
+
+                // Extract user data from the login response
+                const user = userData.user;
+                const loginFormData = {
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  email: user.email,
+                  mobile: user.mobile,
+                  dialingCode: user.dialingCode,
+                };
+
+                // Update form data
+                setFormData(loginFormData);
+
+                // Check for resume journey FIRST
+                try {
+                  const resumeData = await checkResumeJourney(user.email);
+
+                  if (resumeData?.shouldResume) {
+                    // Auto-resume the previous journey
+                    const journey = resumeData.journey;
+                    toast.success(`Resuming your ${journey.fromCountry} → ${journey.toCountry} journey...`);
+
+                    // Call onNext with the previous journey data to continue where left off
+                    onNext(journey.fromCountry, journey.toCountry, loginFormData, journey);
+                    return;
+                  }
+                } catch (error) {
+                  console.error('Failed to check resume journey:', error);
+                  // Continue with normal flow if resume check fails
+                }
+
+                // Check if countries are selected, if not show error
+                if (!fromCountry || !toCountry) {
+                  toast.error("Please select your origin and destination countries first.");
+                  return;
+                }
+
+                // Proceed to next step with countries
+                onNext(fromCountry, toCountry, loginFormData);
+              }}
+              onCancel={() => setShowLogin(false)}
+              onSwitchToRegister={() => {
+                setShowLogin(false);
+                setAuthMode('register');
+                setShowForm(true);
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Coming Soon Modal */}
-      <ComingSoonModal 
+      <ComingSoonModal
         isOpen={showComingSoon}
         onClose={() => setShowComingSoon(false)}
         fromCountry={comingSoonCountries.from}
         toCountry={comingSoonCountries.to}
       />
-      
+
       <Toaster />
     </div>
   );

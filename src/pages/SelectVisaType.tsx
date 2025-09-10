@@ -29,7 +29,7 @@ const studentVisaTypes: VisaType[] = [
     name: "Child Student visa",
     description: "For children aged 4-17 studying at independent schools",
     category: "Child education",
-    processingTime: "3-6 weeks", 
+    processingTime: "3-6 weeks",
     fee: "£524",
   },
   {
@@ -58,15 +58,25 @@ interface SelectVisaTypeProps {
     toCountry: string | null;
     userType: string | null;
   };
+  user?: any;
+  onDashboard?: () => void;
+  onSignOut?: () => void;
 }
 
-export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisaTypeProps) {
+export default function SelectVisaType({
+  onNext,
+  onBack,
+  flowState,
+  user,
+  onDashboard,
+  onSignOut
+}: SelectVisaTypeProps) {
   const [showPersonalizationModal, setShowPersonalizationModal] = useState(false);
   const [showCASInfoModal, setShowCASInfoModal] = useState(false);
   const [selectedVisaType, setSelectedVisaType] = useState<string>("");
   const [hasCAS, setHasCAS] = useState<string>("");
   const [casDate, setCasDate] = useState<Date>();
-  
+
   // Dynamic visa types state
   const [visaTypes, setVisaTypes] = useState<ApiVisaType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,15 +94,15 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
       try {
         setLoading(true);
         setError("");
-        
+
         const apiVisaTypes = await getVisaTypesByRoute(
-          flowState.fromCountry, 
-          flowState.toCountry, 
+          flowState.fromCountry,
+          flowState.toCountry,
           flowState.userType
         );
-        
+
         setVisaTypes(apiVisaTypes);
-        
+
         // If no visa types found from API, use fallback data
         if (apiVisaTypes.length === 0) {
           console.warn('No visa types found from API, using fallback data');
@@ -136,11 +146,11 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
           }));
           setVisaTypes(fallbackApiTypes);
         }
-        
+
       } catch (error) {
         console.error('Failed to load visa types:', error);
         setError("Failed to load visa types. Please try again.");
-        
+
         // Use fallback data on error
         const fallbackApiTypes: ApiVisaType[] = studentVisaTypes.map(visa => ({
           _id: visa.id,
@@ -198,7 +208,7 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
       hasCAS: hasCAS === "yes",
       casDate: hasCAS === "yes" && casDate ? format(casDate, "dd/MM/yyyy") : undefined,
     };
-    
+
     setShowPersonalizationModal(false);
     onNext(selectedVisaType, personalizationData);
   };
@@ -214,14 +224,14 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted">
-      <Navbar />
+      <Navbar user={user} onDashboard={onDashboard} onSignOut={onSignOut} />
       <div className="container mx-auto px-4 py-6 lg:py-8">
         <div className="flex flex-col items-center mb-6 lg:mb-8">
           <VisaMonkLogo className="mb-6 lg:mb-8 animate-fade-in" />
-          
-          <ProgressIndicator 
-            currentStep={3} 
-            totalSteps={4} 
+
+          <ProgressIndicator
+            currentStep={3}
+            totalSteps={4}
             steps={["Countries", "User Type", "Visa Type", "Details"]}
           />
         </div>
@@ -257,30 +267,28 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
               visaTypes.map((visa) => {
                 const isPrimary = visa.code === "student-visa" || visa.category === "student";
                 const isDisabled = false; // All visa types are now enabled
-                
+
                 // Format processing time
-                const processingTime = visa.processingTime.min === visa.processingTime.max 
+                const processingTime = visa.processingTime.min === visa.processingTime.max
                   ? `${visa.processingTime.min} ${visa.processingTime.unit}`
                   : `${visa.processingTime.min}-${visa.processingTime.max} ${visa.processingTime.unit}`;
-                
+
                 // Format fee
                 const fee = `${visa.fees.visaFee.currency} ${visa.fees.visaFee.amount}`;
-              
+
                 return (
                   <Button
                     key={visa._id}
                     variant="card"
                     onClick={() => !isDisabled && handleVisaSelection(visa._id)}
                     disabled={isDisabled}
-                    className={`relative transition-all duration-300 p-4 lg:p-6 h-auto ${
-                      isDisabled 
-                        ? "opacity-60 cursor-not-allowed hover:ring-0 hover:shadow-none hover:scale-100" 
-                        : "hover:ring-2 hover:ring-primary hover:shadow-branded hover:scale-105"
-                    } ${
-                      isPrimary 
-                        ? "border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5" 
+                    className={`relative transition-all duration-300 p-4 lg:p-6 h-auto ${isDisabled
+                      ? "opacity-60 cursor-not-allowed hover:ring-0 hover:shadow-none hover:scale-100"
+                      : "hover:ring-2 hover:ring-primary hover:shadow-branded hover:scale-105"
+                      } ${isPrimary
+                        ? "border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5"
                         : ""
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col space-y-4">
                       <div className="flex items-start justify-between">
@@ -289,7 +297,7 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                             {visa.name}
                           </h3>
                           <div className="flex flex-wrap gap-2 mb-3">
-                            <Badge 
+                            <Badge
                               variant={isPrimary ? "default" : "secondary"}
                             >
                               {visa.category}
@@ -307,11 +315,11 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                           </Badge>
                         )}
                       </div>
-                      
+
                       <p className="text-sm text-muted-foreground leading-relaxed text-left">
                         {visa.description}
                       </p>
-                      
+
                       <div className="flex items-center justify-between pt-4 border-t border-border">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-4 h-4" />
@@ -322,7 +330,7 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                           {fee}
                         </div>
                       </div>
-                  </div>
+                    </div>
                   </Button>
                 );
               })
@@ -330,9 +338,9 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
           </div>
 
           <div className="flex justify-center">
-            <Button 
+            <Button
               onClick={onBack}
-              variant="outline" 
+              variant="outline"
               size="lg"
               className="h-12 px-8"
             >
@@ -410,8 +418,8 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                 <Button variant="outline" onClick={handleCancel} className="flex-1">
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handlePersonalizationSubmit} 
+                <Button
+                  onClick={handlePersonalizationSubmit}
                   disabled={!canSubmit}
                   className="flex-1"
                 >
@@ -432,7 +440,7 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
               <p className="text-sm leading-relaxed text-muted-foreground">
                 CAS is a unique reference number issued by a UK university that confirms you have an offer to study at that institution.
               </p>
-              
+
               <div className="space-y-3">
                 <div className="space-y-2">
                   <h4 className="text-sm font-semibold text-foreground">Why is CAS needed?</h4>
@@ -440,7 +448,7 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                     It's required to apply for your UK Student Visa. The CAS confirms that the university has accepted you as a student and that you meet all the entry requirements for your course.
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <h4 className="text-sm font-semibold text-foreground">How do you get a CAS?</h4>
                   <ul className="text-sm space-y-1 leading-relaxed text-muted-foreground ml-4">
@@ -449,13 +457,13 @@ export default function SelectVisaType({ onNext, onBack, flowState }: SelectVisa
                   </ul>
                 </div>
               </div>
-              
+
               <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-md">
                 <p className="text-sm font-medium text-destructive">
                   Important: You cannot apply for a UK student visa without a CAS.
                 </p>
               </div>
-              
+
               <div className="flex justify-end pt-4">
                 <Button onClick={() => setShowCASInfoModal(false)}>
                   Got it

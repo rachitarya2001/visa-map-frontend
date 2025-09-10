@@ -8,6 +8,9 @@ import { VisaFlowState } from "@/types/visa";
 interface VisaDetailsComingSoonProps {
   onBack: () => void;
   flowState: VisaFlowState;
+  user?: any;
+  onDashboard?: () => void;
+  onSignOut?: () => void;
 }
 
 const getCountryName = (code: string | null) => {
@@ -77,13 +80,13 @@ const getCountryName = (code: string | null) => {
   return countries[code || ""] || code || "Unknown";
 };
 
-export default function VisaDetailsComingSoon({ onBack, flowState }: VisaDetailsComingSoonProps) {
+export default function VisaDetailsComingSoon({ onBack, flowState, user, onDashboard, onSignOut }: VisaDetailsComingSoonProps) {
   const fromCountryName = getCountryName(flowState.fromCountry);
   const toCountryName = getCountryName(flowState.toCountry);
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar user={user} onDashboard={onDashboard} onSignOut={onSignOut} />
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -123,7 +126,7 @@ export default function VisaDetailsComingSoon({ onBack, flowState }: VisaDetails
                 <span className="font-medium text-foreground">{toCountryName}</span>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <p className="text-muted-foreground">
                 We're working hard to bring you comprehensive visa guidance for this route.
@@ -137,8 +140,8 @@ export default function VisaDetailsComingSoon({ onBack, flowState }: VisaDetails
               <Button onClick={onBack} variant="outline">
                 Select Different Countries
               </Button>
-              <Button 
-                onClick={() => window.open('https://visamonk.com', '_blank')} 
+              <Button
+                onClick={() => window.open('https://visamonk.com', '_blank')}
                 variant="default"
               >
                 Visit VisaMonk.com

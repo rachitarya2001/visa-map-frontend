@@ -32,6 +32,9 @@ interface VisaDetailsProps {
   onBack: () => void;
   userFormData?: UserFormData | null;
   personalizationData?: PersonalizationData | null;
+  user?: any;
+  onDashboard?: () => void;
+  onSignOut?: () => void;
 }
 
 const steps = [
@@ -257,7 +260,7 @@ const steps = [
     ]
   },
   {
-    id: "cas", 
+    id: "cas",
     title: "Step 4: CAS (Confirmation of Acceptance for Studies)",
     action: `
       <div>
@@ -599,9 +602,12 @@ const masterDocumentChecklist = [
   "Relationship evidence (for dependents)"
 ];
 
-export default function VisaDetails({ onBack, userFormData, personalizationData }: VisaDetailsProps) {
+export default function VisaDetails({ onBack, userFormData, personalizationData,
+  user,
+  onDashboard,
+  onSignOut }: VisaDetailsProps) {
   const [stepCompletion, setStepCompletion] = useState<Record<string, boolean>>({});
-  const [casStatus, setCasStatus] = useState<{hasCAS: boolean, casDate?: string}>({
+  const [casStatus, setCasStatus] = useState<{ hasCAS: boolean, casDate?: string }>({
     hasCAS: personalizationData?.hasCAS || false,
     casDate: personalizationData?.casDate
   });
@@ -613,7 +619,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
   const [showDocumentPopup, setShowDocumentPopup] = useState(false);
   const [currentScenarioDocuments, setCurrentScenarioDocuments] = useState<string[]>([]);
   const [currentScenarioName, setCurrentScenarioName] = useState("");
-  const [additionalDocuments, setAdditionalDocuments] = useState<Array<{scenario: string, documents: string[]}>>([]);
+  const [additionalDocuments, setAdditionalDocuments] = useState<Array<{ scenario: string, documents: string[] }>>([]);
 
   // Define scenarios with their required documents
   const specialCaseScenarios = [
@@ -752,8 +758,8 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
 
   // Update additional documents based on selected scenarios
   useEffect(() => {
-    const newAdditionalDocs: Array<{scenario: string, documents: string[]}> = [];
-    
+    const newAdditionalDocs: Array<{ scenario: string, documents: string[] }> = [];
+
     selectedScenarios.forEach(scenarioText => {
       // Find the scenario in specialCaseScenarios
       for (const category of specialCaseScenarios) {
@@ -764,7 +770,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
         }
       }
     });
-    
+
     setAdditionalDocuments(newAdditionalDocs);
   }, [selectedScenarios]);
 
@@ -813,17 +819,17 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
     // Mark step as completed
     const newStepCompletion = { ...stepCompletion, [stepId]: true };
     setStepCompletion(newStepCompletion);
-    
+
     // Sync with checklist using the mapping
     const checklistIndex = STEP_TO_CHECKLIST_MAP[stepId];
     if (checklistIndex !== undefined) {
       // Update checklist via custom event
-      const checklistUpdateEvent = new CustomEvent('updateChecklist', { 
-        detail: { index: checklistIndex, checked: true } 
+      const checklistUpdateEvent = new CustomEvent('updateChecklist', {
+        detail: { index: checklistIndex, checked: true }
       });
       window.dispatchEvent(checklistUpdateEvent);
     }
-    
+
     // Save to backend with updated checklist state
     if (userFormData?.email) {
       const updatedChecklistState: Record<string, boolean> = {};
@@ -831,11 +837,11 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
       if (checklistIndex !== undefined) {
         updatedChecklistState[checklistIndex.toString()] = true;
       }
-      
+
       await saveProgress({
         email: userFormData.email,
         originCountry: "India",
-        destinationCountry: "UK", 
+        destinationCountry: "UK",
         personalizationData: casStatus,
         stepCompletion: newStepCompletion,
         checklist: updatedChecklistState,
@@ -850,23 +856,23 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
       const preCompletedSteps = ["unconditional-offer", "cas"];
       let hasUpdates = false;
       const newStepCompletion = { ...stepCompletion };
-      
+
       preCompletedSteps.forEach(stepId => {
         if (!stepCompletion[stepId]) {
           newStepCompletion[stepId] = true;
           hasUpdates = true;
-          
+
           // Sync with checklist
           const checklistIndex = STEP_TO_CHECKLIST_MAP[stepId];
           if (checklistIndex !== undefined) {
-            const checklistUpdateEvent = new CustomEvent('updateChecklist', { 
-              detail: { index: checklistIndex, checked: true } 
+            const checklistUpdateEvent = new CustomEvent('updateChecklist', {
+              detail: { index: checklistIndex, checked: true }
             });
             window.dispatchEvent(checklistUpdateEvent);
           }
         }
       });
-      
+
       if (hasUpdates) {
         setStepCompletion(newStepCompletion);
         // Save the auto-completed steps
@@ -874,7 +880,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
           saveProgress({
             email: userFormData.email,
             originCountry: "India",
-            destinationCountry: "UK", 
+            destinationCountry: "UK",
             personalizationData: casStatus,
             stepCompletion: newStepCompletion,
             timestamps: { casAutoCompleted: new Date().toISOString() }
@@ -886,7 +892,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar user={user} onDashboard={onDashboard} onSignOut={onSignOut} />
       <div className="container mx-auto px-4 py-6 lg:py-8 max-w-7xl">
         <div className="flex items-center gap-4 mb-6 lg:mb-8">
           <div className="flex items-center gap-2">
@@ -906,7 +912,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
               Route Selected
             </Badge>
           </div>
-          
+
           <div className="mb-4">
             <h2 className="text-xl lg:text-2xl font-semibold mb-2">
               Complete Visa Application Guide
@@ -934,7 +940,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                     <Card>
                       <CardContent className="p-6">
                         <p className="text-muted-foreground leading-relaxed">
-                          Visa for full-time study at a licensed UK student sponsor. Apply online from India; 
+                          Visa for full-time study at a licensed UK student sponsor. Apply online from India;
                           prove identity via the UK Immigration: ID Check app or VFS biometrics.
                         </p>
                       </CardContent>
@@ -942,7 +948,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
 
                     <div className="space-y-4">
                       <h2 className="text-xl font-semibold">Knowledge Hub</h2>
-                      
+
                       <Card id="conditional-offer">
                         <CardContent className="p-6">
                           <h3 className="text-lg font-semibold mb-4">What is a Conditional Offer Letter?</h3>
@@ -1068,34 +1074,34 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                   <Card id="edu">
                     <CardContent className="p-6">
                       <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                     <h2><b>Educational Eligibility Documents List:</b></h2>
+                        <h2><b>Educational Eligibility Documents List:</b></h2>
                         <h3>Confirmation of Acceptance for Studies (CAS)</h3>
-                          <li>Issued by your UK educational institution upon acceptance.</li>
-                          <li>Must include the CAS reference number and details of your course.</li>
+                        <li>Issued by your UK educational institution upon acceptance.</li>
+                        <li>Must include the CAS reference number and details of your course.</li>
                         <h3>Academic Qualifications</h3>
-                          <li>Original certificates and transcripts.</li>
-                          <li>Translations if documents are not in English.</li>
+                        <li>Original certificates and transcripts.</li>
+                        <li>Translations if documents are not in English.</li>
                         <h3>English Language Proficiency</h3>
-                          <li>IELTS, TOEFL, or other approved tests.</li>
-                          <li>If the qualification was taught in English, provide proof of this.</li>
+                        <li>IELTS, TOEFL, or other approved tests.</li>
+                        <li>If the qualification was taught in English, provide proof of this.</li>
                         <h3>Academic Technology Approval Scheme (ATAS) Certificate</h3>
-                          <li>Required for certain postgraduate courses in sensitive subjects.</li>
-                          <li>Apply through the UK government website if needed.</li>
+                        <li>Required for certain postgraduate courses in sensitive subjects.</li>
+                        <li>Apply through the UK government website if needed.</li>
 
                         <h3>TB Test Certificate</h3>
-                          <li>Mandatory for applicants from certain countries, including India.</li>
-                          <li>Must be from an approved clinic.</li>                      
+                        <li>Mandatory for applicants from certain countries, including India.</li>
+                        <li>Must be from an approved clinic.</li>
 
                         <h3>Parental Consent (if under 18)</h3>
-                          <li>Written consent from both parents or legal guardians.</li>
-                          <li>Should include consent for visa application, living arrangements, and travel to the UK.</li>                      
+                        <li>Written consent from both parents or legal guardians.</li>
+                        <li>Should include consent for visa application, living arrangements, and travel to the UK.</li>
 
                         <h3>Proof of Relationship to Parent or Guardian (if under 18)</h3>
-                          <li>Birth certificate or other official documents showing parental relationship.</li>
+                        <li>Birth certificate or other official documents showing parental relationship.</li>
 
                         <h3>Letter of Consent from Parents (if under 18 or sponsored by parents)</h3>
-                          <li>Required if parents are financially sponsoring the applicant.</li>
-                          <li>Should confirm their consent for visa application and financial support.</li>                      
+                        <li>Required if parents are financially sponsoring the applicant.</li>
+                        <li>Should confirm their consent for visa application and financial support.</li>
 
                       </ul>
                     </CardContent>
@@ -1104,35 +1110,35 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                   <Card id="Finance">
                     <CardContent className="p-6">
                       <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                      <h2><b>Financial Eligibility Documents List:</b></h2>
+                        <h2><b>Financial Eligibility Documents List:</b></h2>
                         <h3>Bank Statements</h3>
-                          <li>Must show sufficient funds for tuition fees and living costs.</li>
-                          <li>Should cover a consecutive 28-day period ending within 31 days of the application.</li>
+                        <li>Must show sufficient funds for tuition fees and living costs.</li>
+                        <li>Should cover a consecutive 28-day period ending within 31 days of the application.</li>
                         <h3>Bank Balance Certificate</h3>
-                          <li>Official letter from the bank confirming account balance.</li>
-                          <li>Should include bank manager's contact details and be sealed.</li>
+                        <li>Official letter from the bank confirming account balance.</li>
+                        <li>Should include bank manager's contact details and be sealed.</li>
                         <h3>Income Tax Returns (ITR)</h3>
-                          <li>ITRs for the last 3 years to demonstrate financial stability.</li>
+                        <li>ITRs for the last 3 years to demonstrate financial stability.</li>
                         <h3>Net Worth Statement of Parents</h3>
-                          <li>Required if no loan is taken.</li>
-                          <li>Should include assets, liabilities, and overall net worth.</li>
+                        <li>Required if no loan is taken.</li>
+                        <li>Should include assets, liabilities, and overall net worth.</li>
 
                         <h3>Financial Sponsorship Letter</h3>
-                          <li>If sponsored by a third party, provide a letter confirming sponsorship.</li>
-                          <li>Should include sponsor's details and the amount covered..</li>                      
+                        <li>If sponsored by a third party, provide a letter confirming sponsorship.</li>
+                        <li>Should include sponsor's details and the amount covered..</li>
 
                         <h3>Loan Sanction Letter</h3>
-                          <li>If a loan is taken, provide the official sanction letter.</li>
-                          <li>Should include loan amount, terms, and repayment details.</li>
+                        <li>If a loan is taken, provide the official sanction letter.</li>
+                        <li>Should include loan amount, terms, and repayment details.</li>
                         <h3>Salary Slips</h3>
-                          <li>Recent salary slips (last 3 months) to demonstrate income.</li>
+                        <li>Recent salary slips (last 3 months) to demonstrate income.</li>
 
                         <h3>Property Documents</h3>
-                          <li>If assets are used as collateral for loans, provide property documents.</li>
+                        <li>If assets are used as collateral for loans, provide property documents.</li>
                         <h3>Affidavit of Support</h3>
-                          <li>Notarized affidavit from the sponsor confirming financial support.</li>
+                        <li>Notarized affidavit from the sponsor confirming financial support.</li>
                         <h3>Net Worth Certificate</h3>
-                          <li>Certified document from a chartered accountant detailing the sponsor's net worth.</li>
+                        <li>Certified document from a chartered accountant detailing the sponsor's net worth.</li>
 
                       </ul>
                     </CardContent>
@@ -1184,7 +1190,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                       onUpdate={async (hasCAS, casDate) => {
                         const newCasStatus = { hasCAS, casDate };
                         setCasStatus(newCasStatus);
-                        
+
                         // Save to backend
                         if (userFormData?.email) {
                           await saveProgress({
@@ -1202,7 +1208,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                     {/* Timeline Steps */}
                     <div className="space-y-4">
                       <h2 className="text-xl font-semibold">Your Visa Journey Timeline</h2>
-                      
+
                       {steps.map((step, index) => (
                         <TimelineStep
                           key={step.id}
@@ -1218,168 +1224,167 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                         />
                       ))}
                     </div>
-                     
-                     {/* Common Mistakes section only - Documents Checklist moved to sidebar */}
-                     <div className="space-y-4 mt-6">
-                       <Card>
-                         <CardHeader>
-                           <CardTitle className="text-lg flex items-center gap-2">
-                             <AlertTriangle className="w-5 h-5 text-destructive" />
-                             Common Mistakes to Avoid
-                           </CardTitle>
-                         </CardHeader>
-                         <CardContent>
-                           <ul className="space-y-2">
-                             {commonMistakes.map((mistake, index) => (
-                               <li key={index} className="flex items-start gap-3">
-                                 <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
-                                 <span className="text-sm text-muted-foreground">{mistake}</span>
-                               </li>
-                             ))}
-                           </ul>
-                         </CardContent>
-                       </Card>
-                      </div>
-                   </div>
-                 </TabsContent>
 
-                  {/* Special Cases */}
-                  <TabsContent value="special-cases">
-                    <div className="space-y-6">
+                    {/* Common Mistakes section only - Documents Checklist moved to sidebar */}
+                    <div className="space-y-4 mt-6">
                       <Card>
-                        <CardContent className="p-6">
-                          {/* Initial Question */}
-                          <div className="mb-6">
-                            <h3 className="text-lg font-semibold mb-4 text-foreground">
-                              Among the mentioned scenarios, are you facing any issues? Yes or No.
-                            </h3>
-                            
-                            <div className="flex gap-4 mb-6">
-                              <Button
-                                variant={hasFacingIssues === true ? "default" : "outline"}
-                                onClick={() => setHasFacingIssues(true)}
-                                className="px-8"
-                              >
-                                Yes
-                              </Button>
-                              <Button
-                                variant={hasFacingIssues === false ? "default" : "outline"}
-                                onClick={() => {
-                                  setHasFacingIssues(false);
-                                  setSelectedScenarios([]);
-                                  setAdditionalDocuments([]);
-                                }}
-                                className="px-8"
-                              >
-                                No
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Scenarios with checkboxes */}
-                          <p className="text-muted-foreground leading-relaxed mb-6">
-                            In some cases, you may be asked to provide extra information or documents in addition to the standard checklist. Here are the most common scenarios where this applies.
-                          </p>
-                          
-                          <div className="space-y-6">
-                            {specialCaseScenarios.map((category, categoryIndex) => (
-                              <div key={categoryIndex}>
-                                <h3 className="text-lg font-semibold mb-3">{category.category}</h3>
-                                <ul className="space-y-3">
-                                  {category.items.map((item, itemIndex) => (
-                                    <li key={itemIndex} className="flex items-start gap-3">
-                                      <Checkbox
-                                        id={`scenario-${categoryIndex}-${itemIndex}`}
-                                        disabled={hasFacingIssues !== true}
-                                        checked={selectedScenarios.includes(item.text)}
-                                        onCheckedChange={(checked) => {
-                                          handleScenarioCheck(item.text, !!checked);
-                                          if (checked) {
-                                            handleScenarioSelection(item.text, item.documents);
-                                          }
-                                        }}
-                                        className="mt-1"
-                                      />
-                                      <label
-                                        htmlFor={`scenario-${categoryIndex}-${itemIndex}`}
-                                        className={`text-sm leading-relaxed ${
-                                          hasFacingIssues === true ? 'cursor-pointer text-foreground' : 'cursor-not-allowed text-muted-foreground/60'
-                                        }`}
-                                      >
-                                        {item.text}
-                                      </label>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-destructive" />
+                            Common Mistakes to Avoid
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {commonMistakes.map((mistake, index) => (
+                              <li key={index} className="flex items-start gap-3">
+                                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                                <span className="text-sm text-muted-foreground">{mistake}</span>
+                              </li>
                             ))}
-                          </div>
-
-                          {/* No scenarios message - displayed immediately below question */}
-                          {hasFacingIssues === false && (
-                            <div className="mb-6">
-                              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                                <p className="text-green-800 font-medium">
-                                  Great! Please follow the general flow of steps for your application.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Important Guidance */}
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                            <div className="flex items-start gap-3">
-                              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                              <div>
-                                <h4 className="font-semibold text-blue-900 mb-2">Important Guidance</h4>
-                                <p className="text-blue-800 text-sm">
-                                  These are supplementary requirements that may apply to your specific situation. The standard document checklist remains your primary requirement. If any of these scenarios apply to you, prepare the additional documentation proactively to avoid delays in processing.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                          </ul>
                         </CardContent>
                       </Card>
+                    </div>
+                  </div>
+                </TabsContent>
 
-                      {/* Document Popup Dialog */}
-                      <Dialog open={showDocumentPopup} onOpenChange={setShowDocumentPopup}>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Required Documents</DialogTitle>
-                          </DialogHeader>
-                          <div>
-                            <p className="text-muted-foreground mb-4">
-                              Based on the scenario you selected, the following documents are required:
-                            </p>
-                            <ul className="list-disc list-inside space-y-2">
-                              {currentScenarioDocuments.map((doc, index) => (
-                                <li key={index} className="text-sm text-foreground">
-                                  {doc}
-                                </li>
-                              ))}
-                            </ul>
-                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                              <p className="text-green-800 text-sm font-medium">
-                                ✓ These documents have been automatically added to your checklist
-                              </p>
-                            </div>
-                            <Button 
-                              onClick={() => setShowDocumentPopup(false)} 
-                              className="w-full mt-4"
+                {/* Special Cases */}
+                <TabsContent value="special-cases">
+                  <div className="space-y-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        {/* Initial Question */}
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-4 text-foreground">
+                            Among the mentioned scenarios, are you facing any issues? Yes or No.
+                          </h3>
+
+                          <div className="flex gap-4 mb-6">
+                            <Button
+                              variant={hasFacingIssues === true ? "default" : "outline"}
+                              onClick={() => setHasFacingIssues(true)}
+                              className="px-8"
                             >
-                              Got it
+                              Yes
+                            </Button>
+                            <Button
+                              variant={hasFacingIssues === false ? "default" : "outline"}
+                              onClick={() => {
+                                setHasFacingIssues(false);
+                                setSelectedScenarios([]);
+                                setAdditionalDocuments([]);
+                              }}
+                              className="px-8"
+                            >
+                              No
                             </Button>
                           </div>
-                        </DialogContent>
-                      </Dialog>
+                        </div>
 
-                    </div>
-                  </TabsContent>
-               </Tabs>
+                        {/* Scenarios with checkboxes */}
+                        <p className="text-muted-foreground leading-relaxed mb-6">
+                          In some cases, you may be asked to provide extra information or documents in addition to the standard checklist. Here are the most common scenarios where this applies.
+                        </p>
 
-              <Button 
+                        <div className="space-y-6">
+                          {specialCaseScenarios.map((category, categoryIndex) => (
+                            <div key={categoryIndex}>
+                              <h3 className="text-lg font-semibold mb-3">{category.category}</h3>
+                              <ul className="space-y-3">
+                                {category.items.map((item, itemIndex) => (
+                                  <li key={itemIndex} className="flex items-start gap-3">
+                                    <Checkbox
+                                      id={`scenario-${categoryIndex}-${itemIndex}`}
+                                      disabled={hasFacingIssues !== true}
+                                      checked={selectedScenarios.includes(item.text)}
+                                      onCheckedChange={(checked) => {
+                                        handleScenarioCheck(item.text, !!checked);
+                                        if (checked) {
+                                          handleScenarioSelection(item.text, item.documents);
+                                        }
+                                      }}
+                                      className="mt-1"
+                                    />
+                                    <label
+                                      htmlFor={`scenario-${categoryIndex}-${itemIndex}`}
+                                      className={`text-sm leading-relaxed ${hasFacingIssues === true ? 'cursor-pointer text-foreground' : 'cursor-not-allowed text-muted-foreground/60'
+                                        }`}
+                                    >
+                                      {item.text}
+                                    </label>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* No scenarios message - displayed immediately below question */}
+                        {hasFacingIssues === false && (
+                          <div className="mb-6">
+                            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                              <p className="text-green-800 font-medium">
+                                Great! Please follow the general flow of steps for your application.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Important Guidance */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                          <div className="flex items-start gap-3">
+                            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <h4 className="font-semibold text-blue-900 mb-2">Important Guidance</h4>
+                              <p className="text-blue-800 text-sm">
+                                These are supplementary requirements that may apply to your specific situation. The standard document checklist remains your primary requirement. If any of these scenarios apply to you, prepare the additional documentation proactively to avoid delays in processing.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Document Popup Dialog */}
+                    <Dialog open={showDocumentPopup} onOpenChange={setShowDocumentPopup}>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Required Documents</DialogTitle>
+                        </DialogHeader>
+                        <div>
+                          <p className="text-muted-foreground mb-4">
+                            Based on the scenario you selected, the following documents are required:
+                          </p>
+                          <ul className="list-disc list-inside space-y-2">
+                            {currentScenarioDocuments.map((doc, index) => (
+                              <li key={index} className="text-sm text-foreground">
+                                {doc}
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-green-800 text-sm font-medium">
+                              ✓ These documents have been automatically added to your checklist
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => setShowDocumentPopup(false)}
+                            className="w-full mt-4"
+                          >
+                            Got it
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              <Button
                 onClick={onBack}
-                variant="outline" 
+                variant="outline"
                 size="lg"
                 className="w-full"
               >
@@ -1390,13 +1395,13 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
 
             {/* Sidebar */}
             <div className="xl:col-span-1 space-y-6">
-              <InteractiveChecklist 
-                userFormData={userFormData} 
+              <InteractiveChecklist
+                userFormData={userFormData}
                 personalizationData={personalizationData}
                 allTabsVisited={allTabsVisited}
                 stepDetails={steps}
               />
-              
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Documents Checklist</CardTitle>
@@ -1418,7 +1423,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                   </Button>
                 </CardContent>
               </Card>
-              
+
               {/* Additional Documents Checklist - Only show when user selected Yes and has scenarios */}
               {hasFacingIssues === true && additionalDocuments.length > 0 && (
                 <Card>
@@ -1436,8 +1441,8 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                             {item.documents.map((doc, docIndex) => (
                               <li key={docIndex} className="flex items-start gap-3">
                                 <Checkbox id={`additional-doc-${scenarioIndex}-${docIndex}`} className="mt-0.5" />
-                                <label 
-                                  htmlFor={`additional-doc-${scenarioIndex}-${docIndex}`} 
+                                <label
+                                  htmlFor={`additional-doc-${scenarioIndex}-${docIndex}`}
                                   className="text-sm text-muted-foreground cursor-pointer"
                                 >
                                   {doc}
@@ -1455,7 +1460,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
                   </CardContent>
                 </Card>
               )}
-              
+
               <OfficialLinksPanel />
             </div>
           </div>
@@ -1465,7 +1470,7 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
   );
 
   // Helper functions for timeline logic
-  function getStepStatus(stepId: string, index: number, casStatus: {hasCAS: boolean, casDate?: string}): StepStatus {
+  function getStepStatus(stepId: string, index: number, casStatus: { hasCAS: boolean, casDate?: string }): StepStatus {
     // If step is manually completed
     if (stepCompletion[stepId]) {
       return "completed";
@@ -1481,16 +1486,16 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
       if (preCasSteps.includes(stepId)) {
         return "completed";
       }
-      
+
       // First Post-CAS step → In Progress
       if (stepId === "visa-application") {
         return "in-progress";
       }
-      
+
       // Check due soon status for post-CAS steps
       const casDate = new Date(casStatus.casDate.split('/').reverse().join('-'));
       const now = new Date();
-      
+
       if (postCasSteps.includes(stepId)) {
         // Calculate if due soon (within 7 days of calculated due date)
         const dueDate = getDueDateForStep(stepId, casDate);
@@ -1530,31 +1535,31 @@ export default function VisaDetails({ onBack, userFormData, personalizationData 
     }
   }
 
-  function getDueByText(stepId: string, casStatus: {hasCAS: boolean, casDate?: string}): string {
+  function getDueByText(stepId: string, casStatus: { hasCAS: boolean, casDate?: string }): string {
     // For completed steps, show "Completed"
     if (stepCompletion[stepId]) {
       return "Completed";
     }
 
     const preCasSteps = ["unconditional-offer", "atas", "cas"];
-    
+
     if (casStatus.hasCAS && casStatus.casDate) {
       const casDate = new Date(casStatus.casDate.split('/').reverse().join('-'));
-      
+
       // Pre-CAS steps are completed when CAS is received
       if (preCasSteps.includes(stepId)) {
         return "Completed";
       }
-      
+
       // Post-CAS steps show calculated due dates
       const dueDate = getDueDateForStep(stepId, casDate);
       if (dueDate) {
         return `${format(dueDate, 'dd MMM yyyy')}`;
       }
-      
+
       return "After CAS";
     }
-    
+
     // No CAS yet - show relative timing
     switch (stepId) {
       case "unconditional-offer":
